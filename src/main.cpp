@@ -19,7 +19,7 @@ char c;
 int wheel_pwm[4] = {0};
 constexpr int MAX_PWM = 15000;
 float per_adjust = 0.1; // pwmをゆっくり上げるための係数 0.1f ~ 1.0f
-std::array<float, 4> correction_val = {1.00f, 1.00f, 1.00f, 1.00f};
+float correction_val[4] = {1.00f, 1.00f, 1.00f, 1.00f};
 
 enum class State{
     FORWARD,
@@ -70,7 +70,7 @@ int main(){
 
         for (int i = 0; i < 4; ++i){
             penguin.pwm[i] = static_cast<int>(wheel_pwm[i] * per_adjust * correction_val[i] * MAX_PWM);
-            clamp(penguin.pwm[i], -MAX_PWM, MAX_PWM);
+            clamp(int(penguin.pwm[i]), -MAX_PWM, MAX_PWM);
         }
         penguin.send();
         prev_state = state;
