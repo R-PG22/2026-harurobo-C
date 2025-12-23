@@ -16,10 +16,9 @@ char c;
 
 
 // 出力関連の設定
-int wheel_pwm[4] = {0};
+array<float, 4> wheel_pwm = {0};
 constexpr int MAX_PWM = 15000;
 float per_adjust = 0.1; // pwmをゆっくり上げるための係数 0.1f ~ 1.0f
-float correction_val[4] = {1.00f, 1.00f, 1.00f, 1.00f};
 
 enum class State{
     FORWARD,
@@ -61,15 +60,15 @@ int main(){
         penguin.receive[penguin_number].set(msg.data);
         read_controller();
         if (prev_state == state){
-            per_adjust *= 1.5;
+            per_adjust *= 1.5f;
             clamp(per_adjust, 0.1f, 1.0f);
         }else{
-            per_adjust = 0.1;
+            per_adjust = 0.1f;
         }
-        pwm_correction(15);
+        wheel_pwm = pwm_correction(15, 0.1f);
 
         for (int i = 0; i < 4; ++i){
-            penguin.pwm[i] = static_cast<int>(wheel_pwm[i] * per_adjust * correction_val[i] * MAX_PWM);
+            penguin.pwm[i] = static_cast<int>(wheel_pwm[i] * per_adjust * MAX_PWM);
             clamp(int(penguin.pwm[i]), -MAX_PWM, MAX_PWM);
         }
         penguin.send();
@@ -97,42 +96,62 @@ void read_controller(){
     }
 }
 
-void pwm_correction(int tolerance_enc){
+array<float, 4> pwm_correction(int tolerance_enc, float p_gain){
+    array<float, 4> correction_pwm = {penguin.pwm[0], penguin.pwm[1], penguin.pwm[2], penguin.pwm[3]};
+    int diff_01 = penguin.receive[0].enc - penguin.receive[1].enc;
+    int diff_12 = penguin.receive[1].enc - penguin.receive[2].enc;
+    int diff_23 = penguin.receive[2].enc - penguin.receive[3].enc;
+    int diff_30 = penguin.receive[3].enc - penguin.receive[0].enc;
     switch(state){
         case State::FORWARD:
         case State::BACK:
-            if (penguin.receive[0].enc > tolerance_enc){
-                if (correction_val[0] > 1.9f) correction_val[2] *= 0.9f;
-                else correction_val[0] *= 1.1f;
-            }else if (penguin.receive[0].enc < -tolerance_enc){
-                if (correction_val[2] > 1.9f) correction_val[0] *= 0.9f;
-                else correction_val[2] *= 1.1f;
+            if (abs(penguin.receive[0].enc) > tolerance_enc){
+                if (abs(diff_01) > tolerance_enc){
+                    correction_pwm[0] -= diff_01 * p_gain;
+                    correction_pwm[1] += diff_01 * p_gain;
+                }
+                if (abs(diff_23) > tolerance_enc){
+                    correction_pwm[2] -= diff_23 * p_gain;
+                    correction_pwm[3] += diff_23 * p_gain;
+                }
+                int diff_01_23 = (penguin.receive[0].enc + penguin.receive[1].enc) / 2 - 
+                                (penguin.receive[2].enc + penguin.receive[3].enc) / 2;
+                if (abs(diff_01_23) > tolerance_enc){
+                    correction_pwm[0] -= diff_01_23 * p_gain;
+                    correction_pwm[1] -= diff_01_23 * p_gain;
+                    correction_pwm[2] += diff_01_23 * p_gain;
+                    correction_pwm[3] += diff_01_23 * p_gain;
+                }
             }
-            correction_val[0] = clamp(correction_val[0], 0.1f, 2.0f);
-            correction_val[2] = clamp(correction_val[2], 0.1f, 2.0f);
-            correction_val[1] = correction_val[0];
-            correction_val[3] = correction_val[2];
             break;
         case State::RIGHT:
         case State::LEFT:
-            if (penguin.receive[1].enc > tolerance_enc){
-                if (correction_val[1] > 1.9f) correction_val[3] *= 0.9f;
-                else correction_val[1] *= 1.1f;
-            }else if (penguin.receive[1].enc < -tolerance_enc){
-                if (correction_val[3] > 1.9f) correction_val[1] *= 0.9f;
-                else correction_val[3] *= 1.1f;
+            if (abs(penguin.receive[1].enc) > tolerance_enc){
+                if (abs(diff_12) > tolerance_enc){
+                    correction_pwm[1] -= diff_12 * p_gain;
+                    correction_pwm[2] += diff_12 * p_gain;
+                }
+                if (abs(diff_30) > tolerance_enc){
+                    correction_pwm[2] -= diff_30 * p_gain;
+                    correction_pwm[3] += diff_30 * p_gain;
+                }
+                int diff_12_30 = (penguin.receive[1].enc + penguin.receive[2].enc) / 2 - 
+                                (penguin.receive[3].enc + penguin.receive[0].enc) / 2;
+                if (abs(diff_12_30) > tolerance_enc){
+                    correction_pwm[0] -= diff_12_30 * p_gain;
+                    correction_pwm[1] -= diff_12_30 * p_gain;
+                    correction_pwm[2] += diff_12_30 * p_gain;
+                    correction_pwm[3] += diff_12_30 * p_gain;
+                }
             }
-            correction_val[1] = clamp(correction_val[1], 0.1f, 2.0f);
-            correction_val[3] = clamp(correction_val[3], 0.1f, 2.0f);
-            correction_val[0] = correction_val[1];
-            correction_val[2] = correction_val[3];
             break;
         case State::STOP:
             for (int i = 0; i < 4; ++i){
                 penguin.receive[i].enc = 0;
-                correction_val[i] = 1.0f;
             }
+            break;
         default:
             break;
     }
+    return correction_pwm;
 }
