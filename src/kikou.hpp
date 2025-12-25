@@ -82,6 +82,56 @@ void mekanamu(int16_t (&pwm)[4])
         }
     }
 }
+void mekanamu_btn(int16_t (&pwm)[4])
+{
+    int omuni_value = 15000;
+    if (controller["u"])
+    {
+        pwm[0] = omuni_value;
+        pwm[1] = -omuni_value;
+        pwm[2] = -omuni_value;
+        pwm[3] = omuni_value;
+    }
+    else if (controller["d"])
+    {
+        pwm[0] = -omuni_value;
+        pwm[1] = omuni_value;
+        pwm[2] = omuni_value;
+        pwm[3] = -omuni_value;
+    }
+    else if (controller["l"])
+    {
+        pwm[0] = omuni_value;
+        pwm[1] = omuni_value;
+        pwm[2] = -omuni_value;
+        pwm[3] = -omuni_value;
+    }
+    else if (controller["r"])
+    {
+        pwm[0] = -omuni_value;
+        pwm[1] = -omuni_value;
+        pwm[2] = omuni_value;
+        pwm[3] = omuni_value;
+    }else if (controller["R2"])
+    {
+        pwm[0] = -omuni_value / 2;
+        pwm[1] = -omuni_value / 2;
+        pwm[2] = -omuni_value / 2;
+        pwm[3] = -omuni_value / 2;
+    }else if (controller["L2"])
+    {
+        pwm[0] = omuni_value / 2;
+        pwm[1] = omuni_value / 2;
+        pwm[2] = omuni_value / 2;
+        pwm[3] = omuni_value / 2;
+    }else
+    {
+        pwm[0] = 0;
+        pwm[1] = 0;
+        pwm[2] = 0;
+        pwm[3] = 0;
+    }
+}
 // センサー処理関数
 // limit: リミットスイッチの状態
 // up_down: 正負の判定(true:正の場合停止)
