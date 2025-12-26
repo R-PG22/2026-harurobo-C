@@ -6,13 +6,11 @@
 #include "controler.hpp"
 
 // 通信系の設定
-CAN can(PB_12, PB_13, 1e6);
+CAN can(PA_11, PA_12, 1e6);
 CANMessage msg1;
 constexpr int can_id = 35;
 constexpr int penguin_number = 0;
 FirstPenguin penguin(can_id, can);
-// ロリコンは0が横、1が縦とする
-
 
 // 出力関連の設定
 int16_t pwm1[4] = {0};
@@ -24,7 +22,7 @@ float correction_value[4] = {1.0f, 1.0f, 1.0f, 1.0f};
 std::string input = "";
 std::string last_input = "";
 
-void correction(int16_t (&pwm)[4], int tolerance_value){
+void correction(int16_t (&pwm)[4], int tolerance_value, float p_gain){
     bool each_correction[4][4] = {true};
     if (input != last_input){
         for (int i = 0; i < 4; i++){
@@ -47,19 +45,15 @@ void correction(int16_t (&pwm)[4], int tolerance_value){
     
     for (int i = 0; i < 4; i++){
         if (!is_normal[i]){
-            float adjust_value = 0.99f;
+            float adjust_value = 1.0f;
             for (int j = 0; j < 4; j++){
                 if (is_normal[j]){
-                    if (abs(encoder_value[i]) > abs(encoder_value[j])){
-                        adjust_value = 0.99f;
-                    }else if (abs(encoder_value[i]) < abs(encoder_value[j])){
-                        adjust_value = 1.01f;
-                    }
+                    adjust_value += (encoder_value[j] - encoder_value[i])*p_gain;
                 }
             }
             correction_value[i] = adjust_value;
-            if (correction_value[i] < 0.5f) correction_value[i] = 0.5f;
-            if (correction_value[i] > 1.5f) correction_value[i] = 1.5f;
+            if (correction_value[i] < 0.3f) correction_value[i] = 0.3f;
+            if (correction_value[i] > 1.8f) correction_value[i] = 1.8f;
         }
         pwm[i] = static_cast<int16_t>(pwm[i] * correction_value[i]);
     }
@@ -93,7 +87,7 @@ int main(){
         // メカナム計算
         mekanamu_btn(penguin.pwm);
         // 補正処理
-        correction(penguin.pwm, 15);
+        correction(penguin.pwm, 15, 0.001f);
 
         last_input = input;
 
